@@ -404,7 +404,7 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle>CSV 成绩导入</CardTitle>
             <CardDescription>
-              CSV 第一列必须为“姓名”（推荐），或兼容“学号”；后续列名自动识别为科目
+              CSV 前两列必须为“姓名”“班级”（或兼容“学号”“班级”），后续列名自动识别为科目。若学生不存在，将自动创建并生成 6 位随机密码。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -686,16 +686,40 @@ export default function AdminPage() {
                   students.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.name}</TableCell>
-                      <TableCell>{s.className || "-"}</TableCell>
+                      <TableCell>
+                        <Input
+                          value={s.className || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setStudents((prev) => prev.map((x) => (x.id === s.id ? { ...x, className: v } : x)));
+                          }}
+                          placeholder="班级"
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-xs">
                         {s.plainPassword || ""}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-2">
                         <Button
                           size="sm"
-                          variant="destructive"
-                          onClick={() => deleteStudent(s.id)}
+                          variant="outline"
+                          onClick={async () => {
+                            const res = await fetch("/api/admin/students", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ id: s.id, className: s.className || "" }),
+                            });
+                            const data = await res.json().catch(() => null);
+                            if (!res.ok) {
+                              toast.error(data?.message || "更新失败");
+                              return;
+                            }
+                            toast.success("班级已更新");
+                          }}
                         >
+                          保存
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => deleteStudent(s.id)}>
                           删除
                         </Button>
                       </TableCell>
