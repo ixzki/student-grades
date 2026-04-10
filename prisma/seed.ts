@@ -33,6 +33,13 @@ async function main() {
     },
   });
 
+  // 1.5) 系统配置
+  await prisma.appConfig.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1, loginTitle: "学生成绩管理系统" },
+  });
+
   // 2) 考试
   const exam = await prisma.exam.upsert({
     where: { id: "final-2025-term1" },

@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import LoginClient from "./LoginClient";
+import { getLoginTitleSafe } from "@/lib/app-config";
 
-export default function LoginPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LoginPage() {
+  const loginTitle = await getLoginTitleSafe();
+
   return (
     <Suspense fallback={null}>
-      <LoginClient />
+      <LoginClient loginTitle={loginTitle} />
     </Suspense>
   );
 }

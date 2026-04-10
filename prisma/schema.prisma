@@ -56,3 +56,11 @@ model Grade {
   @@index([examId])
   @@index([studentId])
 }
+
+model AppConfig {
+  id         Int      @id @default(1)
+  loginTitle String   @default("学生成绩管理系统")
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

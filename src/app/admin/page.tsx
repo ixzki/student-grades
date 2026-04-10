@@ -58,6 +58,10 @@ export default function AdminPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loadingExams, setLoadingExams] = useState(false);
 
+  // 登录页标题配置
+  const [loginTitle, setLoginTitle] = useState("学生成绩管理系统");
+  const [savingLoginTitle, setSavingLoginTitle] = useState(false);
+
   // 学生列表
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -105,6 +109,43 @@ export default function AdminPage() {
     }
   }
 
+  async function loadConfig() {
+    const res = await fetch("/api/admin/config", { cache: "no-store" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "加载系统配置失败");
+      return;
+    }
+
+    setLoginTitle(String(data?.config?.loginTitle || "学生成绩管理系统"));
+  }
+
+  async function saveConfig(e: React.FormEvent) {
+    e.preventDefault();
+    const v = loginTitle.trim();
+    if (!v) {
+      toast.error("标题不能为空");
+      return;
+    }
+
+    setSavingLoginTitle(true);
+    const res = await fetch("/api/admin/config", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loginTitle: v }),
+    });
+    setSavingLoginTitle(false);
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "保存失败");
+      return;
+    }
+
+    toast.success("登录页标题已更新");
+    setLoginTitle(String(data?.config?.loginTitle || v));
+  }
+
   async function loadStudents() {
     setLoadingStudents(true);
     const res = await fetch("/api/admin/students", { cache: "no-store" });
@@ -122,6 +163,7 @@ export default function AdminPage() {
   useEffect(() => {
     loadExams();
     loadStudents();
+    loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -579,7 +621,7 @@ export default function AdminPage() {
             <CardTitle>修改管理员密码</CardTitle>
             <CardDescription>仅修改当前登录管理员的密码</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <form onSubmit={changeAdminPassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="oldPassword">旧密码</Label>
@@ -615,6 +657,21 @@ export default function AdminPage() {
                 {changingPwd ? "提交中…" : "修改密码"}
               </Button>
             </form>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div>
+                <div className="font-medium">登录页主标题</div>
+                <div className="text-sm text-muted-foreground">学生/管理员登录页顶部显示，可在此修改</div>
+              </div>
+              <form onSubmit={saveConfig} className="space-y-3">
+                <Input value={loginTitle} onChange={(e) => setLoginTitle(e.target.value)} placeholder="例如：XX学校成绩查询系统" />
+                <Button type="submit" disabled={savingLoginTitle} className="w-full" variant="secondary">
+                  {savingLoginTitle ? "保存中…" : "保存标题"}
+                </Button>
+              </form>
+            </div>
           </CardContent>
         </Card>
 
@@ -669,10 +726,10 @@ export default function AdminPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>姓名</TableHead>
-                  <TableHead className="w-40">班级</TableHead>
-                  <TableHead className="w-40">密码</TableHead>
-                  <TableHead className="w-24">操作</TableHead>
+                  <TableHead className="w-32">姓名</TableHead>
+                  <TableHead className="w-44">班级</TableHead>
+                  <TableHead className="w-36">密码</TableHead>
+                  <TableHead className="w-56">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -685,7 +742,7 @@ export default function AdminPage() {
                 ) : (
                   students.map((s) => (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="font-medium max-w-32 truncate">{s.name}</TableCell>
                       <TableCell>
                         <Input
                           value={s.className || ""}
@@ -699,7 +756,7 @@ export default function AdminPage() {
                       <TableCell className="font-mono text-xs">
                         {s.plainPassword || ""}
                       </TableCell>
-                      <TableCell className="flex flex-wrap gap-2">
+                      <TableCell className="flex flex-nowrap gap-2">
                         <Button
                           size="sm"
                           variant="outline"

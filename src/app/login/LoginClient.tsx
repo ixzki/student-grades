@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
-export default function LoginClient() {
+export default function LoginClient({ loginTitle }: { loginTitle?: string }) {
   const router = useRouter();
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") || "/";
@@ -41,7 +41,11 @@ export default function LoginClient() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-1px)] flex items-center justify-center p-6 bg-muted/30">
+    <div className="min-h-[calc(100vh-1px)] flex flex-col items-center justify-center gap-6 p-6 bg-muted/30">
+      <div className="text-center space-y-1">
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{(loginTitle || "学生成绩管理系统").trim()}</h1>
+      </div>
+
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>登录</CardTitle>
