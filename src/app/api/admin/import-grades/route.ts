@@ -53,14 +53,14 @@ export async function POST(req: Request) {
 
   const fields = (parsed.meta.fields || []).map((f) => (f ?? "").trim());
   if (fields.length < 3) {
-    return NextResponse.json({ message: "CSV 至少需要三列：姓名/学号 + 班级 + 科目列" }, { status: 400 });
+    return NextResponse.json({ message: "CSV 至少需要三列：姓名 + 班级 + 科目列" }, { status: 400 });
   }
 
   const idHeader = fields[0];
   const classHeader = fields[1];
 
-  if (idHeader !== "姓名" && idHeader !== "学号") {
-    return NextResponse.json({ message: "CSV 第一列必须命名为“姓名”或“学号”" }, { status: 400 });
+  if (idHeader !== "姓名") {
+    return NextResponse.json({ message: "CSV 第一列必须命名为“姓名”" }, { status: 400 });
   }
   if (classHeader !== "班级") {
     return NextResponse.json({ message: "CSV 第二列必须命名为“班级”" }, { status: 400 });
@@ -99,70 +99,40 @@ export async function POST(req: Request) {
 
     let studentId: string | null = null;
 
-    if (idHeader === "姓名") {
-      const existing = await prisma.user.findFirst({
-        where: { role: "STUDENT", name: loginName },
-        select: { id: true, className: true },
-      });
+    const existing = await prisma.user.findFirst({
+      where: { role: "STUDENT", name: loginName },
+      select: { id: true, className: true },
+    });
 
-      if (existing) {
-        studentId = existing.id;
-        if ((existing.className || "") !== className) {
-          await prisma.user.update({ where: { id: existing.id }, data: { className } });
-        }
-      } else {
-        const pwd = random6Digits();
-        const hash = await bcrypt.hash(pwd, 10);
-
-        // 生成一个内部 username（不用于学生登录）
-        let username = randomUsername();
-        for (let j = 0; j < 5; j++) {
-          const exists = await prisma.user.findUnique({ where: { username }, select: { id: true } });
-          if (!exists) break;
-          username = randomUsername();
-        }
-
-        const created = await prisma.user.create({
-          data: {
-            username,
-            name: loginName,
-            className,
-            password: hash,
-            plainPassword: pwd,
-            role: "STUDENT",
-          },
-          select: { id: true },
-        });
-        studentId = created.id;
+    if (existing) {
+      studentId = existing.id;
+      if ((existing.className || "") !== className) {
+        await prisma.user.update({ where: { id: existing.id }, data: { className } });
       }
     } else {
-      // 兼容旧格式：学号+班级
-      const existing = await prisma.user.findUnique({
-        where: { username: loginName },
-        select: { id: true, role: true, className: true, name: true },
-      });
+      const pwd = random6Digits();
+      const hash = await bcrypt.hash(pwd, 10);
 
-      if (existing && existing.role === "STUDENT") {
-        studentId = existing.id;
-        if ((existing.className || "") !== className) {
-          await prisma.user.update({ where: { id: existing.id }, data: { className } });
-        }
-      } else if (!existing) {
-        const pwd = random6Digits();
-        const hash = await bcrypt.hash(pwd, 10);
-        const created = await prisma.user.create({
-          data: {
-            username: loginName,
-            name: loginName,
-            className,
-            password: hash,
-            plainPassword: pwd,
-            role: "STUDENT",
-          },
-          select: { id: true },
-        });
-        studentId = created.id;
+      // 生成一个内部 username（不用于学生登录）
+      let username = randomUsername();
+      for (let j = 0; j < 5; j++) {
+        const exists = await prisma.user.findUnique({ where: { username }, select: { id: true } });
+        if (!exists) break;
+        username = randomUsername();
       }
+
+      const created = await prisma.user.create({
+        data: {
+          username,
+          name: loginName,
+          className,
+          password: hash,
+          plainPassword: pwd,
+          role: "STUDENT",
+        },
+        select: { id: true },
+      });
+      studentId = created.id;
     }
 
     if (!studentId) {

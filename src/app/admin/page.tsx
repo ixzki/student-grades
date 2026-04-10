@@ -404,7 +404,7 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle>CSV 成绩导入</CardTitle>
             <CardDescription>
-              CSV 前两列必须为“姓名”“班级”（或兼容“学号”“班级”），后续列名自动识别为科目。若学生不存在，将自动创建并生成 6 位随机密码。
+              CSV 前两列必须为“姓名”“班级”，后续列名自动识别为科目。若学生不存在，将自动创建并生成 6 位随机密码。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -485,7 +485,7 @@ export default function AdminPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-24">行号</TableHead>
-                            <TableHead className="w-40">姓名/学号</TableHead>
+                            <TableHead className="w-40">姓名</TableHead>
                             <TableHead>原因</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -699,7 +699,7 @@ export default function AdminPage() {
                       <TableCell className="font-mono text-xs">
                         {s.plainPassword || ""}
                       </TableCell>
-                      <TableCell className="flex gap-2">
+                      <TableCell className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -718,6 +718,30 @@ export default function AdminPage() {
                           }}
                         >
                           保存
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={async () => {
+                            const ok = confirm("确定要重置该学生密码吗？将生成新的 6 位数字密码。");
+                            if (!ok) return;
+                            const res = await fetch("/api/admin/students", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ id: s.id, resetPassword: true }),
+                            });
+                            const data = await res.json().catch(() => null);
+                            if (!res.ok) {
+                              toast.error(data?.message || "重置失败");
+                              return;
+                            }
+                            const newPwd = data?.newPassword || "";
+                            toast.success(`密码已重置：${newPwd}`);
+                            await loadStudents();
+                          }}
+                        >
+                          重置密码
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => deleteStudent(s.id)}>
                           删除
