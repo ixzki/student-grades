@@ -19,6 +19,7 @@ async function main() {
     update: {
       name: "管理员",
       password: adminPasswordHash,
+      plainPassword: null,
       role: Role.ADMIN,
       className: null,
     },
@@ -26,6 +27,7 @@ async function main() {
       username: "admin",
       name: "管理员",
       password: adminPasswordHash,
+      plainPassword: null,
       role: Role.ADMIN,
       className: null,
     },
@@ -38,17 +40,20 @@ async function main() {
       name: "2025学年第一学期期末考试",
       date: new Date("2026-01-15T00:00:00.000Z"),
       subjects: ["语文", "数学", "英语", "科学"],
+      enableClassRank: true,
     },
     create: {
       id: "final-2025-term1",
       name: "2025学年第一学期期末考试",
       date: new Date("2026-01-15T00:00:00.000Z"),
       subjects: ["语文", "数学", "英语", "科学"],
+      enableClassRank: true,
     },
   });
 
   // 3) 学生（九年级7班、8班各 3 个）
-  const studentPasswordHash = await bcrypt.hash("123456", 10);
+  const studentPlainPassword = "123456";
+  const studentPasswordHash = await bcrypt.hash(studentPlainPassword, 10);
 
   const studentsSpec: Array<{ username: string; name: string; className: string }> = [
     { username: "20250701", name: "张同学", className: "九年级7班" },
@@ -66,6 +71,7 @@ async function main() {
       update: {
         name: s.name,
         password: studentPasswordHash,
+        plainPassword: studentPlainPassword,
         role: Role.STUDENT,
         className: s.className,
       },
@@ -73,6 +79,7 @@ async function main() {
         username: s.username,
         name: s.name,
         password: studentPasswordHash,
+        plainPassword: studentPlainPassword,
         role: Role.STUDENT,
         className: s.className,
       },
@@ -116,7 +123,7 @@ async function main() {
 
   console.log("Seed completed:", {
     admin: { username: "admin", password: "adminpassword" },
-    studentPassword: "123456",
+    studentPassword: studentPlainPassword,
     exam: { id: exam.id, name: exam.name },
     students: students.map((s) => ({ username: s.username, className: s.className })),
   });

@@ -44,11 +44,12 @@ export async function POST(req: Request) {
 
   const fields = parsed.meta.fields || [];
   if (fields.length < 2) {
-    return NextResponse.json({ message: "CSV 至少需要两列：学号 + 科目列" }, { status: 400 });
+    return NextResponse.json({ message: "CSV 至少需要两列：姓名/学号 + 科目列" }, { status: 400 });
   }
 
-  if (fields[0] !== "学号") {
-    return NextResponse.json({ message: "CSV 第一列必须命名为“学号”" }, { status: 400 });
+  const idHeader = fields[0];
+  if (idHeader !== "姓名" && idHeader !== "学号") {
+    return NextResponse.json({ message: "CSV 第一列必须命名为“姓名”或“学号”" }, { status: 400 });
   }
 
   const subjectHeaders = fields.slice(1).map((s) => s.trim()).filter(Boolean);
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
   const unknownSubjects = subjectHeaders.filter((h) => !examSubjectSet.has(h));
 
   const rows = parsed.data || [];
-  const errors: Array<{ row: number; username?: string; message: string }> = [];
+  const errors: Array<{ row: number; username?: string; message: string }> = []; // username 字段保留用于兼容旧前端
 
   let upserted = 0;
   let skipped = 0;
@@ -66,21 +67,21 @@ export async function POST(req: Request) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowObj = row as Record<string, unknown>;
-    const username = String(rowObj["学号"] || "").trim();
-    if (!username) {
+    const loginName = String(rowObj[idHeader] || "").trim();
+    if (!loginName) {
       skipped++;
-      errors.push({ row: i + 2, message: "学号为空" });
+      errors.push({ row: i + 2, message: `${idHeader}为空` });
       continue;
     }
 
-    const student = await prisma.user.findUnique({
-      where: { username },
-      select: { id: true, role: true },
-    });
+    const student =
+      idHeader === "学号"
+        ? await prisma.user.findUnique({ where: { username: loginName }, select: { id: true, role: true } })
+        : await prisma.user.findFirst({ where: { name: loginName, role: "STUDENT" }, select: { id: true, role: true } });
 
     if (!student || student.role !== "STUDENT") {
       skipped++;
-      errors.push({ row: i + 2, username, message: "找不到对应学生账号" });
+      errors.push({ row: i + 2, username: loginName, message: "找不到对应学生" });
       continue;
     }
 

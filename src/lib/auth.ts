@@ -11,18 +11,27 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        username: { label: "学号/账号", type: "text" },
+        username: { label: "姓名", type: "text" },
         password: { label: "密码", type: "password" },
       },
       async authorize(credentials) {
-        const username = credentials?.username?.trim();
+        const loginName = credentials?.username?.trim();
         const password = credentials?.password;
-        if (!username || !password) return null;
+        if (!loginName || !password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { username },
-          select: { id: true, username: true, name: true, password: true, role: true, className: true },
-        });
+        // 规则：
+        // - 管理员：使用 username 登录（默认 admin）
+        // - 学生：使用 name（姓名）登录
+        const user =
+          (await prisma.user.findUnique({
+            where: { username: loginName },
+            select: { id: true, username: true, name: true, password: true, role: true, className: true },
+          })) ||
+          (await prisma.user.findFirst({
+            where: { name: loginName, role: "STUDENT" },
+            select: { id: true, username: true, name: true, password: true, role: true, className: true },
+          }));
+
         if (!user) return null;
 
         const ok = await bcrypt.compare(password, user.password);

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { format } from "date-fns";
+
+import { SignOutButton } from "@/components/SignOutButton";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +34,15 @@ type Exam = {
   name: string;
   date: string;
   subjects: string[];
+  enableClassRank: boolean;
+  createdAt: string;
+};
+
+type Student = {
+  id: string;
+  name: string;
+  className: string | null;
+  plainPassword: string | null;
   createdAt: string;
 };
 
@@ -45,6 +57,19 @@ type ImportResult = {
 export default function AdminPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loadingExams, setLoadingExams] = useState(false);
+
+  // 学生列表
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
+
+  // 管理员改密
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPassword2, setNewPassword2] = useState("");
+  const [changingPwd, setChangingPwd] = useState(false);
 
   // 创建考试
   const [examName, setExamName] = useState("");
@@ -80,8 +105,23 @@ export default function AdminPage() {
     }
   }
 
+  async function loadStudents() {
+    setLoadingStudents(true);
+    const res = await fetch("/api/admin/students", { cache: "no-store" });
+    setLoadingStudents(false);
+
+    if (!res.ok) {
+      toast.error("加载学生列表失败");
+      return;
+    }
+
+    const data = await res.json();
+    setStudents(data.students);
+  }
+
   useEffect(() => {
     loadExams();
+    loadStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -164,6 +204,107 @@ export default function AdminPage() {
     toast.success(`导入完成：写入/更新 ${data.upserted} 条，跳过 ${data.skipped} 条`);
   }
 
+  async function addStudent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!studentName.trim() || !studentClass.trim() || !studentPassword.trim()) {
+      toast.error("请填写学生姓名、班级、密码");
+      return;
+    }
+
+    const res = await fetch("/api/admin/students", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: studentName,
+        className: studentClass,
+        password: studentPassword,
+      }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "添加学生失败");
+      return;
+    }
+
+    toast.success("学生已添加");
+    setStudentName("");
+    setStudentClass("");
+    setStudentPassword("");
+    await loadStudents();
+  }
+
+  async function deleteStudent(id: string) {
+    const ok = confirm("确定要删除该学生吗？该学生所有成绩也会被删除。");
+    if (!ok) return;
+
+    const res = await fetch("/api/admin/students", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "删除失败");
+      return;
+    }
+
+    toast.success("已删除");
+    await loadStudents();
+  }
+
+  function exportStudents() {
+    window.location.href = "/api/admin/students/export";
+  }
+
+  async function toggleRank(examId: string, enableClassRank: boolean) {
+    const res = await fetch(`/api/admin/exams/${examId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enableClassRank }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "更新失败");
+      return;
+    }
+
+    setExams((prev) => prev.map((e) => (e.id === examId ? { ...e, enableClassRank } : e)));
+  }
+
+  async function changeAdminPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!oldPassword || newPassword.length < 6) {
+      toast.error("新密码至少 6 位");
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      toast.error("两次输入的新密码不一致");
+      return;
+    }
+
+    setChangingPwd(true);
+    const res = await fetch("/api/admin/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
+    setChangingPwd(false);
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "修改失败");
+      return;
+    }
+
+    toast.success("管理员密码已更新");
+    setOldPassword("");
+    setNewPassword("");
+    setNewPassword2("");
+  }
+
   const selectedExam = exams.find((e) => e.id === selectedExamId) || null;
 
   return (
@@ -173,9 +314,12 @@ export default function AdminPage() {
           <h1 className="text-2xl md:text-3xl font-semibold">管理员后台</h1>
           <p className="text-muted-foreground">创建考试、维护动态科目、导入 CSV 成绩</p>
         </div>
-        <Button variant="secondary" onClick={loadExams} disabled={loadingExams}>
-          {loadingExams ? "刷新中…" : "刷新考试列表"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={loadExams} disabled={loadingExams}>
+            {loadingExams ? "刷新中…" : "刷新考试列表"}
+          </Button>
+          <SignOutButton />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -260,7 +404,7 @@ export default function AdminPage() {
           <CardHeader>
             <CardTitle>CSV 成绩导入</CardTitle>
             <CardDescription>
-              CSV 第一列必须为“学号”，后续列名自动识别为科目
+              CSV 第一列必须为“姓名”（推荐），或兼容“学号”；后续列名自动识别为科目
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -341,7 +485,7 @@ export default function AdminPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-24">行号</TableHead>
-                            <TableHead className="w-40">学号</TableHead>
+                            <TableHead className="w-40">姓名/学号</TableHead>
                             <TableHead>原因</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -376,13 +520,14 @@ export default function AdminPage() {
                 <TableHead>考试名称</TableHead>
                 <TableHead className="w-32">日期</TableHead>
                 <TableHead>科目</TableHead>
-                <TableHead className="w-40">ID</TableHead>
+                <TableHead className="w-32">班级排名</TableHead>
+                <TableHead className="w-24">详情</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {exams.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
                     暂无考试
                   </TableCell>
                 </TableRow>
@@ -400,7 +545,26 @@ export default function AdminPage() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{e.id}</TableCell>
+                    <TableCell>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={e.enableClassRank}
+                          onChange={(ev) => toggleRank(e.id, ev.target.checked)}
+                        />
+                        <span className="text-muted-foreground">
+                          {e.enableClassRank ? "开启" : "关闭"}
+                        </span>
+                      </label>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/admin/exams/${e.id}`}
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                      >
+                        查看
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -408,6 +572,141 @@ export default function AdminPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>修改管理员密码</CardTitle>
+            <CardDescription>仅修改当前登录管理员的密码</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={changeAdminPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="oldPassword">旧密码</Label>
+                <Input
+                  id="oldPassword"
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">新密码</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword2">确认新密码</Label>
+                <Input
+                  id="newPassword2"
+                  type="password"
+                  value={newPassword2}
+                  onChange={(e) => setNewPassword2(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <Button type="submit" disabled={changingPwd} className="w-full">
+                {changingPwd ? "提交中…" : "修改密码"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>学生列表</CardTitle>
+            <CardDescription>学生使用“姓名 + 密码”登录</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <Button variant="secondary" onClick={loadStudents} disabled={loadingStudents}>
+                {loadingStudents ? "刷新中…" : "刷新学生列表"}
+              </Button>
+              <Button variant="outline" onClick={exportStudents}>导出学生名单（CSV）</Button>
+            </div>
+
+            <form onSubmit={addStudent} className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="studentName">姓名</Label>
+                <Input
+                  id="studentName"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="例如：张三"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="studentClass">班级</Label>
+                <Input
+                  id="studentClass"
+                  value={studentClass}
+                  onChange={(e) => setStudentClass(e.target.value)}
+                  placeholder="例如：九年级7班"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="studentPassword">密码</Label>
+                <Input
+                  id="studentPassword"
+                  value={studentPassword}
+                  onChange={(e) => setStudentPassword(e.target.value)}
+                  placeholder="至少 6 位"
+                />
+              </div>
+              <div className="md:col-span-3">
+                <Button type="submit" className="w-full">添加学生</Button>
+              </div>
+            </form>
+
+            <Separator />
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>姓名</TableHead>
+                  <TableHead className="w-40">班级</TableHead>
+                  <TableHead className="w-40">密码</TableHead>
+                  <TableHead className="w-24">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      暂无学生
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  students.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell>{s.className || "-"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {s.plainPassword || ""}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteStudent(s.id)}
+                        >
+                          删除
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

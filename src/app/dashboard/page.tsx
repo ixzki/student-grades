@@ -5,8 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/SignOutButton";
+import { ScoreTrendChart } from "@/app/dashboard/ScoreTrendChart";
 
 function formatScore(v: unknown) {
   const n = typeof v === "number" ? v : v === null || v === undefined ? null : Number(v);
@@ -50,6 +50,8 @@ export default async function DashboardPage() {
   // 计算每场考试的班级排名（同分并列）
   const rankMap = new Map<string, { rank: number; total: number }>();
   for (const g of grades) {
+    if (!g.exam.enableClassRank) continue;
+
     const classmates = await prisma.grade.findMany({
       where: {
         examId: g.examId,
@@ -60,14 +62,37 @@ export default async function DashboardPage() {
     rankMap.set(g.examId, computeRank(classmates, meId));
   }
 
+  // 折线图数据：按时间升序
+  const asc = [...grades].sort((a, b) => new Date(a.exam.date).getTime() - new Date(b.exam.date).getTime());
+  const subjectSet = new Set<string>();
+  for (const g of asc) {
+    for (const s of g.exam.subjects || []) subjectSet.add(s);
+    for (const k of Object.keys((g.scores || {}) as Record<string, unknown>)) subjectSet.add(k);
+  }
+  const subjects = Array.from(subjectSet);
+
+  const trendData = asc.map((g) => {
+    const scores = (g.scores || {}) as Record<string, unknown>;
+    const point: Record<string, number | string | null> = {
+      label: new Date(g.exam.date).toLocaleDateString("zh-CN"),
+      总分: g.totalScore,
+    };
+    for (const s of subjects) {
+      const v = scores[s];
+      point[s] = typeof v === "number" ? v : v === null || v === undefined ? null : Number(v);
+      if (typeof point[s] === "number" && !Number.isFinite(point[s] as number)) point[s] = null;
+    }
+    return point as Record<string, number | string | null> & { label: string };
+  });
+
+  const trendSeries = ["总分", ...subjects];
+
   return (
     <div className="min-h-[calc(100vh-1px)] p-6 md:p-10 space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl md:text-3xl font-semibold">学生成绩</h1>
-          <p className="text-muted-foreground">
-            {session.user.name} · {session.user.className || "未设置班级"}
-          </p>
+          <h1 className="text-2xl md:text-3xl font-semibold">{session.user.name}</h1>
+          <p className="text-muted-foreground">{session.user.className || "未设置班级"}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -86,6 +111,17 @@ export default async function DashboardPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>成绩趋势</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScoreTrendChart data={trendData} series={trendSeries} />
+              <p className="text-xs text-muted-foreground mt-2">
+                横轴按考试日期排列；不同科目用不同颜色；包含总分。
+              </p>
+            </CardContent>
+          </Card>
           {grades.map((g) => {
             const scores = (g.scores || {}) as Record<string, unknown>;
             const subjects = Array.from(
@@ -105,7 +141,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">总分：{g.totalScore}</Badge>
-                      {rank ? (
+                      {g.exam.enableClassRank && rank ? (
                         <Badge variant="outline">
                           班级排名：{rank.rank}/{rank.total}
                         </Badge>

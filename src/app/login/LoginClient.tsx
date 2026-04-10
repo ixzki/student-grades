@@ -15,7 +15,7 @@ export default function LoginClient() {
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") || "/";
 
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +24,7 @@ export default function LoginClient() {
     setLoading(true);
 
     const res = await signIn("credentials", {
-      username,
+      username: name,
       password,
       redirect: false,
     });
@@ -32,7 +32,7 @@ export default function LoginClient() {
     setLoading(false);
 
     if (!res || res.error) {
-      toast.error("账号或密码错误");
+      toast.error("姓名或密码错误");
       return;
     }
 
@@ -45,17 +45,17 @@ export default function LoginClient() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>登录</CardTitle>
-          <CardDescription>学生/管理员使用账号密码登录</CardDescription>
+          <CardDescription>请输入姓名与密码登录</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">学号 / 账号</Label>
+              <Label htmlFor="username">姓名</Label>
               <Input
                 id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="例如：20250701 或 admin"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="请输入姓名"
                 autoComplete="username"
               />
             </div>
@@ -76,11 +76,7 @@ export default function LoginClient() {
               {loading ? "登录中…" : "登录"}
             </Button>
 
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>测试账号：</p>
-              <p>管理员：admin / adminpassword</p>
-              <p>学生：20250701 / 123456</p>
-            </div>
+
           </form>
         </CardContent>
       </Card>
