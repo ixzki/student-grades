@@ -68,9 +68,18 @@ export async function POST(req: Request) {
 
   const subjectHeaders = fields.slice(2).map((s) => s.trim()).filter(Boolean);
 
-  // 可选：提示管理员 CSV 表头科目与 Exam.subjects 不一致
+  // CSV 科目会动态合并到 Exam.subjects，确保管理员端“考试列表/详情”能按导入表头显示
   const examSubjectSet = new Set(exam.subjects);
-  const unknownSubjects = subjectHeaders.filter((h) => !examSubjectSet.has(h));
+  const newSubjects = subjectHeaders.filter((h) => !examSubjectSet.has(h));
+  const mergedSubjects = Array.from(new Set([...exam.subjects, ...subjectHeaders]));
+
+  if (newSubjects.length) {
+    await prisma.exam.update({
+      where: { id: examId },
+      data: { subjects: mergedSubjects },
+      select: { id: true },
+    });
+  }
 
   const rows = parsed.data || [];
   const errors: Array<{ row: number; username?: string; message: string }> = [];
@@ -177,7 +186,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     examId,
     importedSubjects: subjectHeaders,
-    unknownSubjects,
+    newSubjects,
     upserted,
     skipped,
     errors,
