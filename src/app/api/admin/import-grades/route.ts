@@ -22,6 +22,73 @@ function randomUsername() {
   return `stu_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
 }
 
+// 检测是否为 UTF-8 BOM
+function hasUtf8Bom(buffer: Uint8Array): boolean {
+  return buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF;
+}
+
+// 检测是否为 UTF-16 LE BOM
+function hasUtf16LeBom(buffer: Uint8Array): boolean {
+  return buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE;
+}
+
+// 检测是否为 UTF-16 BE BOM
+function hasUtf16BeBom(buffer: Uint8Array): boolean {
+  return buffer.length >= 2 && buffer[0] === 0xFE && buffer[1] === 0xFF;
+}
+
+// 检测字符串中是否包含有效的中文字符（CJK 统一表意文字）
+function hasValidChineseChars(str: string): boolean {
+  const chineseRegex = /[\u4e00-\u9fff]/g;
+  const matches = str.match(chineseRegex);
+  return matches !== null && matches.length >= 2;
+}
+
+// 检查解码结果是否合理（包含预期的中文列名）
+function isValidDecode(str: string): boolean {
+  const expected = ["姓名", "班级", "语文", "数学", "英语", "物理", "化学", "生物", "历史", "地理", "政治"];
+  for (const word of expected) {
+    if (str.includes(word)) return true;
+  }
+  // 或者检查是否有足够多的中文字符
+  return hasValidChineseChars(str);
+}
+
+// 自动检测编码并解码
+function decodeContent(buffer: Uint8Array): string {
+  // 1. 检查 UTF-8 BOM
+  if (hasUtf8Bom(buffer)) {
+    return new TextDecoder("utf-8").decode(buffer.slice(3));
+  }
+  // 2. 检查 UTF-16 LE BOM
+  if (hasUtf16LeBom(buffer)) {
+    return new TextDecoder("utf-16le").decode(buffer.slice(2));
+  }
+  // 3. 检查 UTF-16 BE BOM
+  if (hasUtf16BeBom(buffer)) {
+    return new TextDecoder("utf-16be").decode(buffer.slice(2));
+  }
+
+  // 4. 尝试 UTF-8 解码
+  const utf8Result = new TextDecoder("utf-8").decode(buffer);
+  if (isValidDecode(utf8Result)) {
+    return utf8Result;
+  }
+
+  // 5. 尝试 GBK/GB18030 解码（Vercel/Node.js 环境支持）
+  try {
+    const gbkResult = new TextDecoder("gb18030").decode(buffer);
+    if (isValidDecode(gbkResult)) {
+      return gbkResult;
+    }
+  } catch {
+    // 环境不支持 gb18030
+  }
+
+  // 6. 回退到 UTF-8
+  return utf8Result;
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") {
@@ -41,7 +108,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "考试不存在" }, { status: 404 });
   }
 
-  const csvText = await file.text();
+  // 读取为 ArrayBuffer 以处理不同编码（UTF-8/GBK/ANSI）
+  const arrayBuffer = await file.arrayBuffer();
+  const csvText = decodeContent(arrayBuffer);
   const parsed = Papa.parse<Record<string, unknown>>(csvText, {
     header: true,
     skipEmptyLines: true,

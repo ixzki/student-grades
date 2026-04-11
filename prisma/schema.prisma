@@ -7,24 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  STUDENT
-  ADMIN
-}
-
 model User {
   id            String   @id @default(cuid())
   username      String   @unique
   name          String
   password      String
-  plainPassword String?
   role          Role     @default(STUDENT)
   className     String?
-
-  grades    Grade[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  plainPassword String?
+  grades        Grade[]
 }
 
 model Exam {
@@ -32,12 +25,10 @@ model Exam {
   name            String
   date            DateTime
   subjects        String[]
+  createdAt       DateTime @default(now())
   enableClassRank Boolean  @default(true)
   hidden          Boolean  @default(false)
-
-  grades    Grade[]
-
-  createdAt DateTime @default(now())
+  grades          Grade[]
 }
 
 model Grade {
@@ -46,12 +37,10 @@ model Grade {
   examId     String
   scores     Json
   totalScore Float    @default(0)
-
-  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, examId])
   @@index([examId])
@@ -61,7 +50,11 @@ model Grade {
 model AppConfig {
   id         Int      @id @default(1)
   loginTitle String   @default("学生成绩管理系统")
-
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+enum Role {
+  STUDENT
+  ADMIN
 }
