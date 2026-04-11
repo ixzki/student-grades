@@ -110,7 +110,7 @@ export async function POST(req: Request) {
 
   // 读取为 ArrayBuffer 以处理不同编码（UTF-8/GBK/ANSI）
   const arrayBuffer = await file.arrayBuffer();
-  const csvText = decodeContent(arrayBuffer);
+  const csvText = decodeContent(new Uint8Array(arrayBuffer));
   const parsed = Papa.parse<Record<string, unknown>>(csvText, {
     header: true,
     skipEmptyLines: true,
