@@ -66,6 +66,11 @@ export default function AdminPage() {
   // 学生列表
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentsPage, setStudentsPage] = useState(1);
+  const studentsPageSize = 20;
+  const [studentsTotal, setStudentsTotal] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(studentsTotal / studentsPageSize));
+
   const [studentName, setStudentName] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
@@ -189,9 +194,9 @@ export default function AdminPage() {
     setLoginTitle(String(data?.config?.loginTitle || v));
   }
 
-  async function loadStudents() {
+  async function loadStudents(page = studentsPage) {
     setLoadingStudents(true);
-    const res = await fetch("/api/admin/students", { cache: "no-store" });
+    const res = await fetch(`/api/admin/students?page=${page}&pageSize=${studentsPageSize}`, { cache: "no-store" });
     setLoadingStudents(false);
 
     if (!res.ok) {
@@ -200,12 +205,14 @@ export default function AdminPage() {
     }
 
     const data = await res.json();
-    setStudents(data.students);
+    setStudents(data.students || []);
+    setStudentsTotal(Number(data.total || 0));
+    setStudentsPage(Number(data.page || page));
   }
 
   useEffect(() => {
     loadExams();
-    loadStudents();
+    loadStudents(1);
     loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -316,7 +323,7 @@ export default function AdminPage() {
     setStudentName("");
     setStudentClass("");
     setStudentPassword("");
-    await loadStudents();
+    await loadStudents(1);
   }
 
   async function deleteStudent(id: string) {
@@ -336,7 +343,8 @@ export default function AdminPage() {
     }
 
     toast.success("已删除");
-    await loadStudents();
+    const nextPage = students.length <= 1 ? Math.max(1, studentsPage - 1) : studentsPage;
+    await loadStudents(nextPage);
   }
 
   function exportStudents() {
@@ -658,18 +666,19 @@ export default function AdminPage() {
                       <div className="flex flex-nowrap gap-2">
                         <Link
                           href={`/admin/exams/${e.id}`}
-                          className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                          className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
                         >
                           详情
                         </Link>
                         <Button
                           size="sm"
                           variant={e.hidden ? "secondary" : "outline"}
+                          className="h-8"
                           onClick={() => toggleHidden(e.id, !e.hidden)}
                         >
                           {e.hidden ? "取消隐藏" : "隐藏"}
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => deleteExam(e.id)}>
+                        <Button size="sm" className="h-8" variant="destructive" onClick={() => deleteExam(e.id)}>
                           删除
                         </Button>
                       </div>
@@ -749,7 +758,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Button variant="secondary" onClick={loadStudents} disabled={loadingStudents}>
+              <Button variant="secondary" onClick={() => loadStudents(studentsPage)} disabled={loadingStudents}>
                 {loadingStudents ? "刷新中…" : "刷新学生列表"}
               </Button>
               <Button variant="outline" onClick={exportStudents}>导出学生名单（CSV）</Button>
@@ -789,6 +798,46 @@ export default function AdminPage() {
             </form>
 
             <Separator />
+
+            <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+              <div>
+                共 {studentsTotal} 名学生 · 第 {studentsPage}/{totalPages} 页
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingStudents || studentsPage <= 1}
+                  onClick={() => loadStudents(1)}
+                >
+                  首页
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingStudents || studentsPage <= 1}
+                  onClick={() => loadStudents(studentsPage - 1)}
+                >
+                  上一页
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingStudents || studentsPage >= totalPages}
+                  onClick={() => loadStudents(studentsPage + 1)}
+                >
+                  下一页
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingStudents || studentsPage >= totalPages}
+                  onClick={() => loadStudents(totalPages)}
+                >
+                  末页
+                </Button>
+              </div>
+            </div>
 
             <Table>
               <TableHeader>
@@ -862,7 +911,7 @@ export default function AdminPage() {
                             }
                             const newPwd = data?.newPassword || "";
                             toast.success(`密码已重置：${newPwd}`);
-                            await loadStudents();
+                            await loadStudents(studentsPage);
                           }}
                         >
                           重置密码

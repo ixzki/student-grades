@@ -13,25 +13,40 @@ function random6Digits() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "ADMIN") {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const students = await prisma.user.findMany({
-    where: { role: "STUDENT" },
-    orderBy: [{ className: "asc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      className: true,
-      plainPassword: true,
-      createdAt: true,
-    },
-  });
+  const url = new URL(req.url);
+  const pageRaw = Number(url.searchParams.get("page") || "1");
+  const pageSizeRaw = Number(url.searchParams.get("pageSize") || "20");
 
-  return NextResponse.json({ students });
+  const pageSize = Number.isFinite(pageSizeRaw) ? Math.min(Math.max(pageSizeRaw, 1), 100) : 20;
+  const page = Number.isFinite(pageRaw) ? Math.max(pageRaw, 1) : 1;
+  const skip = (page - 1) * pageSize;
+
+  const where = { role: "STUDENT" as const };
+
+  const [total, students] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      orderBy: [{ className: "asc" }, { name: "asc" }],
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        name: true,
+        className: true,
+        plainPassword: true,
+        createdAt: true,
+      },
+    }),
+  ]);
+
+  return NextResponse.json({ students, page, pageSize, total });
 }
 
 export async function POST(req: Request) {
