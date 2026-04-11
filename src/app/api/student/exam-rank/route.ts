@@ -37,8 +37,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: "缺少 examId" }, { status: 400 });
   }
 
-  const exam = await prisma.exam.findUnique({ where: { id: examId }, select: { enableClassRank: true } });
-  if (!exam) {
+  const exam = await prisma.exam.findUnique({ where: { id: examId }, select: { enableClassRank: true, hidden: true } });
+  if (!exam || exam.hidden) {
     return NextResponse.json({ message: "考试不存在" }, { status: 404 });
   }
   if (!exam.enableClassRank) {

@@ -17,7 +17,8 @@ type ExamDetail = {
   date: string;
   subjects: string[];
   enableClassRank: boolean;
-  grades: Array<{
+  hidden: boolean;
+  grades: Array<{ 
     id: string;
     scores: Record<string, number | null>;
     totalScore: number;
@@ -139,6 +140,7 @@ export default function AdminExamDetailPage() {
           <CardTitle>{exam?.name || "-"}</CardTitle>
           <CardDescription>
             {exam ? format(new Date(exam.date), "yyyy-MM-dd") : ""} · 班级排名：{exam?.enableClassRank ? "开启" : "关闭"}
+            {exam?.hidden ? " · 状态：隐藏" : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

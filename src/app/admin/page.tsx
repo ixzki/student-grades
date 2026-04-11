@@ -35,6 +35,7 @@ type Exam = {
   date: string;
   subjects: string[];
   enableClassRank: boolean;
+  hidden: boolean;
   createdAt: string;
 };
 
@@ -50,7 +51,7 @@ type ImportResult = {
   upserted: number;
   skipped: number;
   importedSubjects: string[];
-  unknownSubjects: string[];
+  newSubjects: string[];
   errors: Array<{ row: number; username?: string; message: string }>;
 };
 
@@ -102,11 +103,53 @@ export default function AdminPage() {
     }
 
     const data = await res.json();
-    setExams(data.exams);
+    const list: Exam[] = data.exams || [];
+    setExams(list);
 
-    if (!selectedExamId && data.exams?.[0]?.id) {
-      setSelectedExamId(data.exams[0].id);
+    // 选择考试（仅允许未隐藏）
+    const current = selectedExamId ? list.find((x) => x.id === selectedExamId) : null;
+    if (!selectedExamId || current?.hidden) {
+      const first = list.find((x) => !x.hidden);
+      setSelectedExamId(first?.id || "");
     }
+  }
+
+  async function toggleHidden(examId: string, nextHidden: boolean) {
+    const tip = nextHidden
+      ? "确定要隐藏该考试吗？隐藏后将删除该考试所有成绩（学生端也将不可见）。"
+      : "确定要取消隐藏该考试吗？（注意：之前隐藏时已删除成绩）";
+    const ok = confirm(tip);
+    if (!ok) return;
+
+    const res = await fetch(`/api/admin/exams/${examId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hidden: nextHidden }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "操作失败");
+      return;
+    }
+
+    toast.success(nextHidden ? "已隐藏" : "已取消隐藏");
+    await loadExams();
+  }
+
+  async function deleteExam(examId: string) {
+    const ok = confirm("确定要删除该考试吗？将删除该考试及其全部成绩，此操作不可恢复。");
+    if (!ok) return;
+
+    const res = await fetch(`/api/admin/exams/${examId}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast.error(data?.message || "删除失败");
+      return;
+    }
+
+    toast.success("考试已删除");
+    await loadExams();
   }
 
   async function loadConfig() {
@@ -461,7 +504,7 @@ export default function AdminPage() {
                     <SelectValue placeholder="请选择考试" />
                   </SelectTrigger>
                   <SelectContent>
-                    {exams.map((e) => (
+                    {exams.filter((e) => !e.hidden).map((e) => (
                       <SelectItem key={e.id} value={e.id}>
                         {e.name}
                       </SelectItem>
@@ -512,10 +555,9 @@ export default function AdminPage() {
                         </Badge>
                       ))}
                     </div>
-                    {importResult.unknownSubjects?.length ? (
+                    {importResult.newSubjects?.length ? (
                       <p className="text-xs text-amber-600 mt-2">
-                        注意：以下科目不在 Exam.subjects 中（仍会写入 scores）：
-                        {importResult.unknownSubjects.join("、")}
+                        本次导入新增科目：{importResult.newSubjects.join("、")}（已自动同步到考试科目）
                       </p>
                     ) : null}
                   </div>
@@ -563,20 +605,28 @@ export default function AdminPage() {
                 <TableHead className="w-32">日期</TableHead>
                 <TableHead>科目</TableHead>
                 <TableHead className="w-32">班级排名</TableHead>
-                <TableHead className="w-24">详情</TableHead>
+                <TableHead className="w-20">状态</TableHead>
+                <TableHead className="w-72">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {exams.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     暂无考试
                   </TableCell>
                 </TableRow>
               ) : (
                 exams.map((e) => (
                   <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{e.name}</span>
+                        {e.hidden ? (
+                          <Badge variant="outline" className="text-amber-700 border-amber-200">已隐藏</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>{format(new Date(e.date), "yyyy-MM-dd")}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
@@ -600,12 +650,29 @@ export default function AdminPage() {
                       </label>
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/admin/exams/${e.id}`}
-                        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
-                      >
-                        查看
-                      </Link>
+                      <span className={e.hidden ? "text-amber-700" : "text-muted-foreground"}>
+                        {e.hidden ? "隐藏" : "正常"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-nowrap gap-2">
+                        <Link
+                          href={`/admin/exams/${e.id}`}
+                          className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                        >
+                          详情
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant={e.hidden ? "secondary" : "outline"}
+                          onClick={() => toggleHidden(e.id, !e.hidden)}
+                        >
+                          {e.hidden ? "取消隐藏" : "隐藏"}
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => deleteExam(e.id)}>
+                          删除
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

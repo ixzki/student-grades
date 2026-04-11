@@ -33,6 +33,7 @@ model Exam {
   date            DateTime
   subjects        String[]
   enableClassRank Boolean  @default(true)
+  hidden          Boolean  @default(false)
 
   grades    Grade[]
 

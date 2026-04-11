@@ -11,6 +11,15 @@ export async function GET() {
 
   const exams = await prisma.exam.findMany({
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      subjects: true,
+      enableClassRank: true,
+      hidden: true,
+      createdAt: true,
+    },
   });
 
   return NextResponse.json({ exams });

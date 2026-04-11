@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   const className = session.user.className || "";
 
   const grades = await prisma.grade.findMany({
-    where: { studentId: meId },
+    where: { studentId: meId, exam: { hidden: false } },
     include: { exam: true },
     orderBy: [{ exam: { date: "desc" } }, { createdAt: "desc" }],
   });
