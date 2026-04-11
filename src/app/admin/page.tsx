@@ -116,8 +116,8 @@ export default function AdminPage() {
 
   async function toggleHidden(examId: string, nextHidden: boolean) {
     const tip = nextHidden
-      ? "确定要隐藏该考试吗？隐藏后将删除该考试所有成绩（学生端也将不可见）。"
-      : "确定要取消隐藏该考试吗？（注意：之前隐藏时已删除成绩）";
+      ? "确定要隐藏该考试吗？隐藏后学生端将不可见（成绩会保留，可随时取消隐藏）。"
+      : "确定要取消隐藏该考试吗？取消后学生端将恢复可见。";
     const ok = confirm(tip);
     if (!ok) return;
 

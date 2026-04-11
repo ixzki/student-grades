@@ -62,10 +62,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ examId: strin
     return NextResponse.json({ message: "缺少可更新字段" }, { status: 400 });
   }
 
-  // 隐藏考试时：删除该考试全部成绩
-  if (data.hidden === true) {
-    await prisma.grade.deleteMany({ where: { examId: id } });
-  }
+  // 软隐藏：仅从学生端隐藏，不删除成绩（可随时取消隐藏恢复可见）
 
   const exam = await prisma.exam.update({
     where: { id },
