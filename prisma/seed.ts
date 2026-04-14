@@ -44,37 +44,38 @@ async function main() {
   const exam = await prisma.exam.upsert({
     where: { id: "final-2025-term1" },
     update: {
-      name: "2025学年第一学期期末考试",
+      name: "2025 学年第一学期期末考试",
       date: new Date("2026-01-15T00:00:00.000Z"),
       subjects: ["语文", "数学", "英语", "科学"],
       enableClassRank: true,
     },
     create: {
       id: "final-2025-term1",
-      name: "2025学年第一学期期末考试",
+      name: "2025 学年第一学期期末考试",
       date: new Date("2026-01-15T00:00:00.000Z"),
       subjects: ["语文", "数学", "英语", "科学"],
       enableClassRank: true,
     },
   });
 
-  // 3) 学生（九年级7班、8班各 3 个）
+  // 3) 学生（九年级 7 班、8 班各 3 个）
+  // 注意：学生使用姓名（name）登录，username 也设为姓名（确保姓名唯一）
   const studentPlainPassword = "123456";
   const studentPasswordHash = await bcrypt.hash(studentPlainPassword, 10);
 
-  const studentsSpec: Array<{ username: string; name: string; className: string }> = [
-    { username: "20250701", name: "张同学", className: "九年级7班" },
-    { username: "20250702", name: "李同学", className: "九年级7班" },
-    { username: "20250703", name: "王同学", className: "九年级7班" },
-    { username: "20250801", name: "赵同学", className: "九年级8班" },
-    { username: "20250802", name: "钱同学", className: "九年级8班" },
-    { username: "20250803", name: "孙同学", className: "九年级8班" },
+  const studentsSpec: Array<{ name: string; className: string }> = [
+    { name: "张同学", className: "九年级 7 班" },
+    { name: "李同学", className: "九年级 7 班" },
+    { name: "王同学", className: "九年级 7 班" },
+    { name: "赵同学", className: "九年级 8 班" },
+    { name: "钱同学", className: "九年级 8 班" },
+    { name: "孙同学", className: "九年级 8 班" },
   ];
 
-  const students = [] as Array<{ id: string; username: string; className: string }>;
+  const students = [] as Array<{ id: string; name: string; className: string }>;
   for (const s of studentsSpec) {
     const user = await prisma.user.upsert({
-      where: { username: s.username },
+      where: { username: s.name },
       update: {
         name: s.name,
         password: studentPasswordHash,
@@ -83,7 +84,7 @@ async function main() {
         className: s.className,
       },
       create: {
-        username: s.username,
+        username: s.name,
         name: s.name,
         password: studentPasswordHash,
         plainPassword: studentPlainPassword,
@@ -91,21 +92,21 @@ async function main() {
         className: s.className,
       },
     });
-    students.push({ id: user.id, username: user.username, className: user.className ?? "" });
+    students.push({ id: user.id, name: user.name, className: user.className ?? "" });
   }
 
   // 4) 成绩（每人一条，包含 4 科）
   const scoresBank: Record<string, Record<string, number>> = {
-    "20250701": { 语文: 92, 数学: 88, 英语: 95, 科学: 90 },
-    "20250702": { 语文: 85, 数学: 91, 英语: 78, 科学: 84 },
-    "20250703": { 语文: 76, 数学: 80, 英语: 82, 科学: 79 },
-    "20250801": { 语文: 89, 数学: 87, 英语: 90, 科学: 88 },
-    "20250802": { 语文: 93, 数学: 94, 英语: 92, 科学: 91 },
-    "20250803": { 语文: 81, 数学: 83, 英语: 85, 科学: 80 },
+    "张同学": { "语文": 92, "数学": 88, "英语": 95, "科学": 90 },
+    "李同学": { "语文": 85, "数学": 91, "英语": 78, "科学": 84 },
+    "王同学": { "语文": 76, "数学": 80, "英语": 82, "科学": 79 },
+    "赵同学": { "语文": 89, "数学": 87, "英语": 90, "科学": 88 },
+    "钱同学": { "语文": 93, "数学": 94, "英语": 92, "科学": 91 },
+    "孙同学": { "语文": 81, "数学": 83, "英语": 85, "科学": 80 },
   };
 
   for (const s of students) {
-    const scores = scoresBank[s.username];
+    const scores = scoresBank[s.name];
     const totalScore = sumScores(scores);
 
     await prisma.grade.upsert({
@@ -132,7 +133,7 @@ async function main() {
     admin: { username: "admin", password: "adminpassword" },
     studentPassword: studentPlainPassword,
     exam: { id: exam.id, name: exam.name },
-    students: students.map((s) => ({ username: s.username, className: s.className })),
+    students: students.map((s) => ({ name: s.name, className: s.className })),
   });
 }
 

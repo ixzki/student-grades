@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(openssl rand:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm db:seed:*)",
+      "Bash(netstat:*)"
+    ]
+  }
+}
